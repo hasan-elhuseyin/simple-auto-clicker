@@ -1,7 +1,7 @@
+import os
 import time
 import pickle
 import threading
-import os
 from pynput import mouse, keyboard
 from overlay import show_overlay
 from constants import MACRO_FOLDER, DEFAULT_MACRO
@@ -61,7 +61,7 @@ def replay_loop(status_callback=None):
         cycle_count += 1
         if status_callback:
             status_callback(f"▶️ Replaying (Cycle {cycle_count})")
-        show_overlay(f"Cycle {cycle_count}", duration=0.8)
+        # overlay removed inside loop
 
         start = time.time()
         for e in recorded:
@@ -88,9 +88,10 @@ def replay_loop(status_callback=None):
                 except Exception:
                     pass
 
+    # Show overlay only once after replay stops
     if status_callback:
         status_callback("⏹ Idle")
-    show_overlay("Replay Stopped")
+    show_overlay(f"Replayed {cycle_count} cycle{'s' if cycle_count > 1 else ''}")
     mode = "idle"
 
 def start_replay(status_callback=None):
@@ -117,7 +118,7 @@ def on_click(x, y, button, pressed):
     if mode == "recording":
         events.append(("mouse", x, y, button, pressed, time.time() - start_time))
 
-def on_press(key, status_callback=None, record_key='0', replay_key='-', stop_key='esc'):
+def on_press(key, status_callback=None, record_key='0', replay_key='-'):
     global mode, events
     try:
         # Recording toggle
@@ -134,11 +135,11 @@ def on_press(key, status_callback=None, record_key='0', replay_key='-', stop_key
             return
 
         # Stop key (ESC)
-        if hasattr(key, 'name') and key.name == stop_key and mode == "replaying":
+        if hasattr(key, 'name') and key.name == 'esc' and mode == "replaying":
             stop_replay(status_callback)
             return
 
-        # Recording key events
+        # Record key events
         if mode == "recording":
             events.append(("key", key, True, time.time() - start_time))
     except Exception as e:
