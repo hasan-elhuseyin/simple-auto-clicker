@@ -1,20 +1,28 @@
 import time
 import pickle
 import threading
+import os
 from pynput import mouse, keyboard
-from constants import MACRO_FILE
 from overlay import show_overlay
+from constants import MACRO_FOLDER, DEFAULT_MACRO
 
+# ------------------ Globals ------------------
 events = []
 start_time = None
 mode = "idle"  # idle | recording | replaying
+current_macro_file = os.path.join(MACRO_FOLDER, DEFAULT_MACRO)
+cycle_count = 0
+
+replay_thread = None
 
 kb = keyboard.Controller()
 ms = mouse.Controller()
 
-# ------------------ Core Functions ------------------
+# ------------------ Recording ------------------
 def start_recording(status_callback=None):
     global events, start_time, mode
+    if mode != "idle":
+        return
     events = []
     start_time = time.time()
     mode = "recording"
@@ -23,18 +31,22 @@ def start_recording(status_callback=None):
     show_overlay("Recording Started")
 
 def stop_recording(status_callback=None):
-    global events, mode
-    with open(MACRO_FILE, "wb") as f:
+    global events, mode, current_macro_file
+    if not current_macro_file or os.path.isdir(current_macro_file):
+        current_macro_file = os.path.join(MACRO_FOLDER, DEFAULT_MACRO)
+    os.makedirs(MACRO_FOLDER, exist_ok=True)
+    with open(current_macro_file, "wb") as f:
         pickle.dump(events, f)
     mode = "idle"
     if status_callback:
-        status_callback("✅ Saved recording")
+        status_callback(f"✅ Saved: {os.path.basename(current_macro_file)}")
     show_overlay("Recording Stopped")
 
+# ------------------ Replay ------------------
 def replay_loop(status_callback=None):
-    global mode
+    global mode, cycle_count
     try:
-        with open(MACRO_FILE, "rb") as f:
+        with open(current_macro_file, "rb") as f:
             recorded = pickle.load(f)
     except FileNotFoundError:
         if status_callback:
@@ -43,15 +55,19 @@ def replay_loop(status_callback=None):
         return
 
     mode = "replaying"
-    if status_callback:
-        status_callback("▶️ Replaying...")
-    show_overlay("Replay Started")
+    cycle_count = 0
 
     while mode == "replaying":
+        cycle_count += 1
+        if status_callback:
+            status_callback(f"▶️ Replaying (Cycle {cycle_count})")
+        show_overlay(f"Cycle {cycle_count}", duration=0.8)
+
         start = time.time()
         for e in recorded:
             if mode != "replaying":
                 break
+
             delay = e[-1]
             time.sleep(max(0, start + delay - time.time()))
 
@@ -75,41 +91,81 @@ def replay_loop(status_callback=None):
     if status_callback:
         status_callback("⏹ Idle")
     show_overlay("Replay Stopped")
+    mode = "idle"
 
 def start_replay(status_callback=None):
-    t = threading.Thread(target=replay_loop, args=(status_callback,), daemon=True)
-    t.start()
+    """Replay toggle: start if idle, stop if replaying."""
+    global replay_thread, mode
+    if mode == "replaying":
+        stop_replay(status_callback)
+        return
+    if mode != "idle":
+        return  # do not start if recording
+
+    replay_thread = threading.Thread(target=replay_loop, args=(status_callback,), daemon=True)
+    replay_thread.start()
 
 def stop_replay(status_callback=None):
     global mode
-    mode = "idle"
-    if status_callback:
-        status_callback("⏹ Idle")
+    if mode == "replaying":
+        mode = "idle"
+        if status_callback:
+            status_callback("⏹ Idle")
 
-# ------------------ Listeners ------------------
+# ------------------ Input Listeners ------------------
 def on_click(x, y, button, pressed):
     if mode == "recording":
         events.append(("mouse", x, y, button, pressed, time.time() - start_time))
 
-def on_press(key, status_callback=None, record_key='0', replay_key='=', stop_key='esc'):
+def on_press(key, status_callback=None, record_key='0', replay_key='-', stop_key='esc'):
     global mode, events
-    if hasattr(key, 'char') and key.char == record_key:
-        if mode == "idle":
-            start_recording(status_callback)
-        elif mode == "recording":
-            stop_recording(status_callback)
-        return
-    if hasattr(key, 'char') and key.char == replay_key and mode == "idle":
-        start_replay(status_callback)
-        return
-    if hasattr(key, 'name') and key.name == stop_key and mode == "replaying":
-        stop_replay(status_callback)
-        return
+    try:
+        # Recording toggle
+        if hasattr(key, 'char') and key.char == record_key:
+            if mode == "idle":
+                start_recording(status_callback)
+            elif mode == "recording":
+                stop_recording(status_callback)
+            return
 
-    if mode == "recording":
-        events.append(("key", key, True, time.time() - start_time))
+        # Replay toggle
+        if hasattr(key, 'char') and key.char == replay_key:
+            start_replay(status_callback)
+            return
+
+        # Stop key (ESC)
+        if hasattr(key, 'name') and key.name == stop_key and mode == "replaying":
+            stop_replay(status_callback)
+            return
+
+        # Recording key events
+        if mode == "recording":
+            events.append(("key", key, True, time.time() - start_time))
+    except Exception as e:
+        print(f"Listener error: {e}")
 
 def on_release(key):
-    global events
     if mode == "recording":
         events.append(("key", key, False, time.time() - start_time))
+
+# ------------------ Macro Selection ------------------
+def set_macro_file(file_name):
+    global current_macro_file
+    os.makedirs(MACRO_FOLDER, exist_ok=True)
+
+    if not file_name or file_name.endswith(os.sep):
+        file_name = DEFAULT_MACRO
+    elif not file_name.endswith(".pkl"):
+        file_name += ".pkl"
+
+    current_macro_file = os.path.join(MACRO_FOLDER, file_name)
+
+# ------------------ Initialization ------------------
+def initialize_macros():
+    os.makedirs(MACRO_FOLDER, exist_ok=True)
+    default_file_path = os.path.join(MACRO_FOLDER, DEFAULT_MACRO)
+    if not os.path.isfile(default_file_path):
+        with open(default_file_path, "wb") as f:
+            pickle.dump([], f)
+
+initialize_macros()
