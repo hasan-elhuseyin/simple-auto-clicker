@@ -1,7 +1,7 @@
 import tkinter as tk
 import threading
 import time
-from constants import OVERLAY_DURATION, OVERLAY_ALPHA
+from src.constants import OVERLAY_DURATION, OVERLAY_ALPHA
 
 def show_overlay(message, duration=OVERLAY_DURATION):
     overlay = tk.Toplevel()

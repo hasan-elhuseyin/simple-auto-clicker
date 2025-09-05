@@ -3,8 +3,8 @@ import time
 import pickle
 import threading
 from pynput import mouse, keyboard
-from overlay import show_overlay
-from constants import MACRO_FOLDER, DEFAULT_MACRO
+from src.overlay import show_overlay
+from src.constants import MACRO_FOLDER, DEFAULT_MACRO
 
 # ------------------ Globals ------------------
 events = []

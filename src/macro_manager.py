@@ -1,5 +1,5 @@
 import os
-from constants import MACRO_FOLDER
+from src.constants import MACRO_FOLDER
 
 def list_macros():
     os.makedirs(MACRO_FOLDER, exist_ok=True)
