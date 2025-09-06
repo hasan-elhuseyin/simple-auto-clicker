@@ -1,13 +1,12 @@
 import time
 import pickle
 import threading
-import tkinter as tk
 from pynput import mouse, keyboard
 
 # ------------------ CONFIGURABLE HOTKEYS ------------------
 RECORD_KEY = '0'   # Toggle recording on/off
-REPLAY_KEY = '-'   # Start replay loop
-STOP_KEY = 'esc'   # Stop replay (use 'esc' as string)
+REPLAY_KEY = '-'   # Toggle replay on/off
+STOP_KEY = 'esc'   # Emergency stop (always works)
 
 # ------------------ GLOBALS ------------------
 events = []
@@ -18,20 +17,30 @@ macro_file = "macro.pkl"
 kb = keyboard.Controller()
 ms = mouse.Controller()
 
+
+# ------------------ UTILS ------------------
+def show_hotkeys():
+    print(f"⏹ Idle")
+    print(f"Hotkeys: Record[{RECORD_KEY}] | Replay[{REPLAY_KEY}] | EmergencyStop[{STOP_KEY.upper()}]")
+
+
 # ------------------ CORE FUNCTIONS ------------------
 def start_recording():
     global events, start_time, mode
     events = []
     start_time = time.time()
     mode = "recording"
-    status_var.set("🎤 Recording...")
+    print("🎤 Recording... (press 0 again to stop)")
+
 
 def stop_recording():
     global events, mode
     with open(macro_file, "wb") as f:
         pickle.dump(events, f)
     mode = "idle"
-    status_var.set("✅ Saved recording")
+    print("✅ Saved recording")
+    show_hotkeys()
+
 
 def replay_loop():
     global mode
@@ -39,10 +48,12 @@ def replay_loop():
         with open(macro_file, "rb") as f:
             recorded = pickle.load(f)
     except FileNotFoundError:
-        status_var.set("⚠️ No macro recorded!")
+        print("⚠️ No macro recorded!")
+        mode = "idle"
+        show_hotkeys()
         return
 
-    status_var.set("▶️ Replaying... (press Stop/ESC)")
+    print("▶️ Replaying... (press - again or ESC to stop)")
     mode = "replaying"
 
     while mode == "replaying":
@@ -69,21 +80,34 @@ def replay_loop():
                         kb.release(key)
                 except Exception:
                     pass
-    status_var.set("⏹ Idle")
 
-def start_replay():
-    t = threading.Thread(target=replay_loop, daemon=True)
-    t.start()
+    # don’t print idle here → toggle_replay() or stop_all() will handle it
 
-def stop_replay():
+
+def toggle_replay():
+    global mode
+    if mode == "idle":
+        t = threading.Thread(target=replay_loop, daemon=True)
+        t.start()
+    elif mode == "replaying":
+        mode = "idle"
+        print("⏹ Stopped replay")
+        show_hotkeys()
+
+
+def stop_all():
+    """Emergency stop (ESC key)."""
     global mode
     mode = "idle"
-    status_var.set("⏹ Idle")
+    print("⏹ Emergency stop")
+    show_hotkeys()
+
 
 # ------------------ LISTENERS ------------------
 def on_click(x, y, button, pressed):
     if mode == "recording":
         events.append(("mouse", x, y, button, pressed, time.time() - start_time))
+
 
 def on_press(key):
     global events, mode
@@ -95,48 +119,35 @@ def on_press(key):
         elif mode == "recording":
             stop_recording()
         return
-    # Start replay
-    if hasattr(key, 'char') and key.char == REPLAY_KEY and mode == "idle":
-        start_replay()
+
+    # Toggle replay
+    if hasattr(key, 'char') and key.char == REPLAY_KEY:
+        toggle_replay()
         return
-    # Stop replay
-    if hasattr(key, 'name') and key.name == STOP_KEY and mode == "replaying":
-        stop_replay()
+
+    # Emergency stop (ESC)
+    if hasattr(key, 'name') and key.name == STOP_KEY:
+        stop_all()
         return
 
     if mode == "recording":
         events.append(("key", key, True, time.time() - start_time))
 
+
 def on_release(key):
     if mode == "recording":
         events.append(("key", key, False, time.time() - start_time))
 
-# ------------------ UI ------------------
-root = tk.Tk()
-root.title("Auto Clicker Macro")
-root.geometry("300x250")
 
-status_var = tk.StringVar(value="⏹ Idle")
-status_label = tk.Label(root, textvariable=status_var, font=("Arial", 14))
-status_label.pack(pady=10)
+# ------------------ MAIN ------------------
+if __name__ == "__main__":
+    show_hotkeys()
 
-record_btn = tk.Button(root, text=f"Toggle Recording ({RECORD_KEY})", width=25,
-                       command=lambda: start_recording() if mode=="idle" else stop_recording())
-record_btn.pack(pady=5)
+    ml = mouse.Listener(on_click=on_click)
+    kl = keyboard.Listener(on_press=on_press, on_release=on_release)
+    ml.start()
+    kl.start()
 
-play_btn = tk.Button(root, text=f"Start Replay ({REPLAY_KEY})", width=25, command=start_replay)
-play_btn.pack(pady=5)
-
-stop_play_btn = tk.Button(root, text=f"Stop Replay ({STOP_KEY.upper()})", width=25, command=stop_replay)
-stop_play_btn.pack(pady=5)
-
-exit_btn = tk.Button(root, text="Exit", width=25, command=root.quit)
-exit_btn.pack(pady=5)
-
-# Start listeners
-ml = mouse.Listener(on_click=on_click)
-kl = keyboard.Listener(on_press=on_press, on_release=on_release)
-ml.start()
-kl.start()
-
-root.mainloop()
+    # Keep program alive
+    ml.join()
+    kl.join()
