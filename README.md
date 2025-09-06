@@ -45,7 +45,7 @@ simple-auto-clicker/
     ├── constants.py     # Hotkeys, paths, overlay settings
     ├── macro.py         # Recording/replaying logic
     ├── macro_manager.py # Macro listing utilities
-    ├── overlay.py       # Floating overlay system
+    └── overlay.py       # Floating overlay system
 ```
 
 ---
