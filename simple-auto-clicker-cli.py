@@ -1,3 +1,4 @@
+import os
 import time
 import pickle
 import threading
@@ -12,7 +13,11 @@ STOP_KEY = 'esc'   # Emergency stop (always works)
 events = []
 start_time = None
 mode = "idle"   # idle | recording | replaying
-macro_file = "macro.pkl"
+
+# Ensure macros directory exists
+MACRO_DIR = "macros"
+os.makedirs(MACRO_DIR, exist_ok=True)
+macro_file = os.path.join(MACRO_DIR, "macro.pkl")
 
 kb = keyboard.Controller()
 ms = mouse.Controller()
@@ -38,7 +43,7 @@ def stop_recording():
     with open(macro_file, "wb") as f:
         pickle.dump(events, f)
     mode = "idle"
-    print("✅ Saved recording")
+    print(f"✅ Saved recording → {macro_file}")
     show_hotkeys()
 
 
@@ -80,8 +85,7 @@ def replay_loop():
                         kb.release(key)
                 except Exception:
                     pass
-
-    # don’t print idle here → toggle_replay() or stop_all() will handle it
+    # no idle print here, handled by toggle_replay()
 
 
 def toggle_replay():
