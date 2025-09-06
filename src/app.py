@@ -9,7 +9,8 @@ def run_app():
     # ------------------ UI ------------------
     root = tk.Tk()
     root.title("Simple Auto Clicker")
-    root.geometry("450x400")
+    root.geometry("400x250")
+    root.resizable(False, False)
 
     status_var = tk.StringVar(value="⏹ Idle")
     status_label = tk.Label(root, textvariable=status_var, font=("Arial", 14))
