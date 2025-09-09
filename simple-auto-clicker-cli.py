@@ -3,6 +3,8 @@ import time
 import pickle
 import threading
 from pynput import mouse, keyboard
+import simpleaudio as sa
+import numpy as np
 
 # ------------------ CONFIGURABLE HOTKEYS ------------------
 RECORD_KEY = '0'   # Toggle recording on/off
@@ -27,6 +29,15 @@ ms = mouse.Controller()
 def show_hotkeys():
     print(f"⏹ Idle")
     print(f"Hotkeys: Record[{RECORD_KEY}] | Replay[{REPLAY_KEY}] | EmergencyStop[{STOP_KEY.upper()}]")
+
+def beep(frequency=1000):
+    duration=0.1
+    volume=0.3
+    fs = 44100  # samples per second
+    t = np.linspace(0, duration, int(fs*duration), False)
+    note = np.sin(frequency * t * 2 * np.pi) * volume
+    audio = (note * 32767).astype(np.int16)
+    sa.play_buffer(audio, 1, 2, fs)
 
 
 # ------------------ CORE FUNCTIONS ------------------
@@ -120,8 +131,10 @@ def on_press(key):
     if hasattr(key, 'char') and key.char == RECORD_KEY:
         if mode == "idle":
             start_recording()
+            beep(frequency=2000)
         elif mode == "recording":
             stop_recording()
+            beep(frequency=500)
         return
 
     # Toggle replay

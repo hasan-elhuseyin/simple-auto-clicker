@@ -1,1 +1,3 @@
 pynput>=1.7.6
+simpleaudio>=1.0.4
+numpy>=1.24.3
