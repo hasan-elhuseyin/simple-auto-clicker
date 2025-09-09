@@ -15,7 +15,7 @@ start_time = None
 mode = "idle"   # idle | recording | replaying
 
 # Ensure macros directory exists
-MACRO_DIR = "macros"
+MACRO_DIR = "."
 os.makedirs(MACRO_DIR, exist_ok=True)
 macro_file = os.path.join(MACRO_DIR, "macro.pkl")
 
