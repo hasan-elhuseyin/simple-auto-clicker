@@ -8,4 +8,4 @@ __pycache__/
 # Virtual environments
 venv/
 .env/
-/macros
+macros/
